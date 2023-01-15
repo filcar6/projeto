@@ -1,0 +1,262 @@
+from random import uniform
+from numpy import log,e,sqrt
+from math import inf
+
+class Individuo():
+    def _init_(self,x,y,f_ganho,tau,mu,rho,delta):
+        self._x=x
+        self._y=y
+        self._f_ganho=f_ganho
+        self._tau=tau
+        self._mu=mu
+        self._rho=rho
+        self._delta=delta
+        self.__atualizaConfortoETsM()
+    def daPosX(self):
+        return self._x
+    def daPosY(self):
+        return self._y
+    def pos(self):
+        return (self._x,self._y)
+    def alteraPosX(self,x):
+        self._x=x
+        self.__atualizaConfortoETsM()
+    def alteraPosY(self,y):
+        self._y=y
+        self.__atualizaConfortoETsM()
+    def daConforto(self):
+        return self._conforto
+    def daIntervMTAteMorte(self):
+        return self._intervmtatemorte
+    def daIntervMTAteProxDeslocamento(self):
+        return self._intervmtateproxdeslocamento
+    def daIntervMTAteProxReproducao(self):
+        return self._intervmtateproxreproducao
+    def __atualizaConfortoETsM(self):
+        self._conforto=1-e**(-self._f_ganho(self._x,self._y))
+        if self._conforto>1-e**(-self._tau):
+            self._intervmtatemorte=self._tau*self._mu
+            self._intervmtateproxdeslocamento=self._tau*self._delta
+        elif self._conforto<e**(-self._tau):
+            self._intervmtatemorte=e**(-self._tau)*self._mu
+            self._intervmtateproxdeslocamento=e**(-self._tau)*self._delta
+        else:
+            self._intervmtatemorte=(-log(1-self._conforto))*self._mu
+            self._intervmtateproxdeslocamento=(-log(1-self._conforto))*self._delta
+
+        if self._conforto>1-e**(-self._tau):
+            self._intervmtateproxreproducao=e**(-self._tau)*self._rho
+        elif self._conforto<e**(-self._tau):
+            self._intervmtateproxreproducao=self._tau*self._rho
+        else:
+            self._intervmtateproxreproducao=(-log(self._conforto))*self._rho
+    def daCCarsComQuaseTodosAtributos(self):
+        s="(IND="+str(self)+",x="+str(self._x)+",y="+str(self._y)+\
+                ",tmmorte="+str(self._intervmtatemorte)+\
+                ",tmdesl="+str(self._intervmtateproxdeslocamento)+\
+                ",tmrepr="+str(self._intervmtateproxreproducao)+\
+                ",conf="+str(self._conforto)+")"
+        return s
+    def daCCarsComAtributosRelevantes(self):
+        s="("+str(self._x)+","+str(self._y)+"), e g("+str(self._x)+","+\
+                        str(self._y)+")="+str(self._f_ganho(self._x,self._y))
+        return s
+    
+    def reproduz(self, outro_individuo):
+        x1, y1 = self.daPosX(), self.daPosY()
+        x2, y2 = outro_individuo.daPosX(), outro_individuo.daPosY()
+        x = uniform(min(x1, x2), max(x1, x2))
+        y = uniform(min(y1, y2), max(y1, y2))
+        g = self._f_ganho(x,y)
+        return Individuo(x, y, g, self._tau, self._mu, self._rho, self._delta)
+    
+
+
+class Evento():
+    def _init_(self,tipo,indiv,t):
+        self._tipo=tipo
+        self._individuo=indiv
+        self._tocorrencia=t
+    def daTipo(self):
+        return self._tipo
+    def daIndividuo(self):
+        return self._individuo
+    def daTempo(self):
+        return self._tocorrencia
+    def daCCarsComAtributos(self):
+        s="(" + self._tipo + "," + self._individuo.daCCarsComQuaseTodosAtributos() + ",t=" +\
+                str(self._tocorrencia) + ")"
+        return s
+
+
+class CEP():
+    def _init_(self):
+        self._lEventos=[]
+    def colocaEv(self,ev):
+        lEsq=0
+        lDir=len(self._lEventos)-1
+        while lEsq<=lDir:
+            iMeio=(lEsq+lDir)//2
+            if self._lEventos[iMeio].daTempo()<=ev.daTempo():
+                lEsq=iMeio+1
+            else:
+                lDir=iMeio-1
+        self._lEventos.insert(lEsq,ev)
+    def daERetiraEvComMenorTempo(self):
+        if len(self._lEventos)==0:
+            print("CEP::DAERETIRAEVCOMMENORTEMPO::ERRO: cep vazia")
+            return
+        return self._lEventos.pop(0)
+    def retiraEvsComEsteIndividuo(self,indiv):
+        i=0
+        lEvsInicial=self._lEventos
+        self._lEventos=[]
+        for ev in lEvsInicial:
+            if ev.daIndividuo()!=indiv:
+                self._lEventos.append(ev)
+    def daNumeroEvs(self):
+        return len(self._lEventos)
+    def mostra(self):
+        if len(self._lEventos)==0:
+            print("CEP::MOSTRA::ERRO: cep vazia")
+            return
+        s="<\n "+self._lEventos[0].daCCarsComAtributos()
+        for ev in self._lEventos[1:]:
+            s+=";\n "+ev.daCCarsComAtributos()
+        s+="\n>"
+        print(s)
+
+
+class Populacao():
+    def _init_(self):
+        self._lIndivs=[]
+    def colocaIndiv(self,indiv):
+        if indiv in self._lIndivs:
+            print("POPULACAO::COLOCAINDIV::ERRO: o indivíduo ",indiv,\
+                          " já existe na população")
+            return
+        self._lIndivs.append(indiv)
+    def retiraIndiv(self,indiv):
+        if indiv not in self._lIndivs:
+            print("POPULACAO::RETIRAINDIV::ERRO: o indivíduo ",indiv,\
+                  " não existe na população que tem ",self.daNumeroIndivs(),\
+                  "indivíduos")
+            return
+        while indiv in self._lIndivs:
+            self._lIndivs.remove(indiv)
+            if indiv in self._lIndivs:
+                print("POPULACAO::RETIRAINDIV::ERRO: o indivíduo ",indiv,\
+                      " existe repetido várias vezes na população.")
+    def daNumeroIndivs(self):
+        return len(self._lIndivs)
+    def daIndivComMaiorConforto(self):
+        if len(self._lIndivs)==0:
+            print("POPULACAO::DAINDIVCOMMAIORCONFORTO::ERRO: população vazia")
+            return
+        maiorConfortoAteAgora=-inf
+        for indivAtual in self._lIndivs:
+            confAtual=indivAtual.daConforto()
+            if confAtual>maiorConfortoAteAgora:
+                maiorConfortoAteAgora=confAtual
+                indivComMaiorConforto=indivAtual
+        return indivComMaiorConforto
+    def daIndivMaisProxDeAExcecaoDoProprioEL(self,indiv,lIndivsANaoConsiderar):
+        def distanciaEntreIndivs(indiv1,indiv2):
+            return sqrt((indiv1.daPosX()-indiv2.daPosX())**2+\
+                                (indiv1.daPosY()-indiv2.daPosY())**2)    
+        lIndivsAConsiderar=[]
+        for indivAtual in self._lIndivs:
+            if indivAtual!=indiv:
+                if indivAtual not in lIndivsANaoConsiderar:
+                    lIndivsAConsiderar.append(indivAtual)
+        if lIndivsAConsiderar==[]:
+            print("POPULACAO::DAINDIVMAISPROXDEAEXCECAODOPROPRIOEL::ERRO: população alvo vazia")
+            return
+        menorDistAteAgora=+inf
+        for indivAtual in lIndivsAConsiderar:
+            distAtual=distanciaEntreIndivs(indiv,indivAtual)
+            if distAtual<menorDistAteAgora:
+                menorDistAteAgora=distAtual
+                indivAMenorDist=indivAtual
+        return indivAMenorDist
+    def mostra(self):
+        if len(self._lIndivs)==0:
+            print("POPULACAO::MOSTRA::ERRO: população vazia")
+            return
+        primIndiv=self._lIndivs[0]
+        tam=len(self._lIndivs)
+        s="<TAM:"+str(tam)+"\n1.="+primIndiv.daCCarsComQuaseTodosAtributos()
+        i=1
+        while i<len(self._lIndivs):
+            s+=";\n"+str(i+1)+".="+self._lIndivs[i].daCCarsComQuaseTodosAtributos()
+            i=i+1
+        s+="\n>"
+        print(s)
+    def mostraResumido(self):
+        if len(self._lIndivs)==0:
+            print("POPULACAO::MOSTRA::ERRO: população vazia")
+            return
+        primIndiv=self._lIndivs[0]
+        tam=len(self._lIndivs)
+        s="<TAM:"+str(tam)+"\n1.="+primIndiv.daCCarsComAtributosRelevantes()
+        i=1
+        while i<len(self._lIndivs):
+            s+=";\n"+str(i+1)+".="+self._lIndivs[i].daCCarsComAtributosRelevantes()
+            i=i+1
+        s+="\n>"
+        print(s)
+        
+        
+
+def simulador(N, Nmax, xa, xb, ya, yb, tau, mu, rho, delta, alpha, f_ganho, teta):
+    cep = CEP()
+    populacao = Populacao()
+    
+    for i in range(N):
+        x = uniform(xa, xb)
+        y = uniform(ya, yb)
+        g = fganho(x, y)
+        indiv = Individuo(x, y, g, tau, mu, rho, delta)
+        populacao.colocaIndiv(indiv)
+        cep.colocaEv(Evento("morte", indiv, indiv.daIntervMTAteMorte()))
+        cep.colocaEv(Evento("deslocamento", indiv, indiv.daIntervMTAteProxDeslocamento()))
+        cep.colocaEv(Evento("reprodução", indiv, indiv.daIntervMTAteProxReproducao()))
+    t_obs = teta
+    indiv_com_maior_conforto = populacao.daIndivComMaiorConforto()     
+    
+    while cep.daNumeroEvs() > 0:
+        ev = cep.daERetiraEvComMenorTempo()
+        t = ev.daTempo()
+        indiv = ev.daIndividuo()
+        
+        if ev.daTipo() == "morte":
+            populacao.retiraIndiv(indiv)
+        elif ev.daTipo() == "deslocamento":
+            x, y = indiv.pos()
+            x += uniform(-alpha * (1 - indiv.daConforto()) * * 2, alpha * (1 - indiv.daConforto()) * * 2)
+            y += uniform(-alpha * (1 - indiv.daConforto()) * * 2, alpha * (1 - indiv.daConforto()) * * 2)
+            if x < xa or x > xb or y < ya or y > yb:
+                cep.colocaEv(Evento("deslocamento", indiv, t))
+            else:
+                indiv.mudaPos(x, y)
+                g = fganho(x, y)
+                indiv.mudaFuncGanho(g)
+                cep.colocaEv(Evento("deslocamento", indiv, t + indiv.daIntervMTAteProxDeslocamento()))
+        elif ev.daTipo() == "reprodução":
+            indiv_prox = populacao.daIndivMaisProxDeAExcecaoDoProprioEL(indiv, [indiv])
+            if indiv_prox is not None:
+                novo_indiv = indiv.reproduz(indiv_prox)
+                if novo_indiv is not None:
+                    populacao.colocaIndiv(novo_indiv)
+                    cep.colocaEv(Evento("morte", novo_indiv, t + novo_indiv.daIntervMTAteMorte()))
+                    cep.colocaEv(Evento("deslocamento", novo_indiv, t + novo_indiv.daIntervMTAteProxDeslocamento()))
+                    cep.colocaEv(Evento("reprodução", novo_indiv, t + novo_indiv.daIntervMTAteProxReproducao()))
+        
+        if t >= t_obs:
+            indiv_com_maior_conforto = populacao.daIndivComMaiorConforto()
+            x, y = indiv_com_maior_conforto.pos()
+            print("Observacao em t=", t, ": num_evs=", cep.daNumeroEvs(), " | tam_pop=", populacao.daNumeroIndivs(), " | pos_indiv_mais_conforto=", x, y, " | fganho_indiv_mais_conforto=", indiv_com_maior_conforto.daFuncganho())
+            t_obs += teta
+    return indiv_com_maior_conforto.daFuncGanho()
+
+simulador(100,1000,0,10,0,10,50,1,2,3,5,lambda x,y:x** 2*y** 2,10)
